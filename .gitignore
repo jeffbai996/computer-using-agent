@@ -25,6 +25,7 @@ venv/
 .venv/
 
 # Scratch data
+.cua-data/
 *.db
 *.sqlite
 *.sqlite3

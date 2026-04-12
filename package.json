@@ -1,0 +1,23 @@
+{
+  "name": "computer-using-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "TypeScript-first playground for human-in-the-loop computer-use apps.",
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present",
+    "dev": "concurrently -n agent,dashboard -c cyan,green \"npm run dev --workspace @cua/agent\" \"npm run dev --workspace @cua/dashboard\"",
+    "test": "vitest run"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.15.0",
+    "concurrently": "^9.1.2",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2"
+  }
+}

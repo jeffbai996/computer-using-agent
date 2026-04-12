@@ -44,6 +44,31 @@ flowchart LR
 - Allowlist / denylist
 - Session export
 
+## Quick Start
+
+```bash
+npm install
+npm run dev
+```
+
+The local API starts at `http://127.0.0.1:4317`.
+The dashboard starts at `http://127.0.0.1:5173`.
+
+By default, the app uses a fake model and fake browser so the approval loop can be tested without spending API calls or opening a real browser.
+
+```bash
+npm run cli --workspace @cua/agent -- start "open a mock browser task"
+npm run cli --workspace @cua/agent -- approve <sessionId>
+npm run cli --workspace @cua/agent -- export <sessionId>
+```
+
+To use the real OpenAI and Playwright edges, set `OPENAI_API_KEY`, install Playwright's browser bundle, and pass `--real`.
+
+```bash
+npx playwright install chromium
+npm run cli --workspace @cua/agent -- serve --real
+```
+
 ## MVP Spec
 
 ### 1. CLI runner

@@ -1,0 +1,28 @@
+{
+  "name": "@cua/agent",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "dev": "tsx src/cli/index.ts serve",
+    "cli": "tsx src/cli/index.ts"
+  },
+  "dependencies": {
+    "@cua/core": "0.1.0",
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "openai": "^4.96.0",
+    "playwright": "^1.52.0",
+    "tsx": "^4.19.4",
+    "zod": "^3.24.4"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.15.0",
+    "typescript": "^5.8.3"
+  }
+}
