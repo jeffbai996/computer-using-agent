@@ -1,22 +1,82 @@
 # computer-using-agent
 
-An open-source playground for building human-in-the-loop apps on top of OpenAI's computer-use preview tooling.
+TypeScript-first playground for building human-in-the-loop apps on top of OpenAI's computer-use preview tooling.
 
-## Why this repo exists
+## About
 
-Computer use is interesting when the work is repetitive, screen-driven, and annoying enough that you would rather hand it to an agent with guardrails than keep doing it yourself.
+This repo is for agents that interact with screens, browsers, and desktop workflows that are too annoying, too repetitive, or too brittle to keep doing by hand.
 
-This repo is meant to stay public, simple, and experiment-friendly while the product shape is still fuzzy.
+The point is not "fully autonomous magic." The point is a useful control loop with explicit approvals, trace logs, screenshots, and a sane escape hatch when the model gets weird.
 
-## What we might build
+## Why TypeScript
 
-- A browser operator for repetitive admin tasks
-- A QA runner that can click through flows and report where the UI breaks
-- A research assistant that collects data from web workflows with an audit trail
-- A semi-automated back office copilot that asks for confirmation before risky steps
-- A desktop helper for brittle, screen-based tasks that normal APIs do not cover
+TypeScript is the clean default here because the product naturally wants a web UI, browser automation, and a control plane that can all live in the same ecosystem.
 
-## Design principles
+That said, the runtime can still be shaped a few ways:
+
+- CLI-first for the fastest smoke tests
+- Local web app for task submission, approvals, and trace review
+- Desktop shell later if we want something more polished
+
+A pure hosted website cannot directly take over your computer by itself. If we want "control my computer through a website," the website becomes the front end and a local agent or remote VM does the actual computer work.
+
+## Suggested Architecture
+
+```mermaid
+flowchart LR
+  U[User] --> UI[Web UI or CLI]
+  UI --> API[Task API]
+  API --> AGENT[TypeScript agent worker]
+  AGENT --> CUA[OpenAI computer-use-preview]
+  AGENT --> BROWSER[Local browser or VM]
+  BROWSER --> AGENT
+  AGENT --> STORE[SQLite + artifacts]
+  STORE --> UI
+```
+
+## Core Pieces
+
+- Task input
+- Approval checkpoints
+- Screenshot timeline
+- Action trace
+- Retry / rollback boundaries
+- Allowlist / denylist
+- Session export
+
+## MVP Spec
+
+### 1. CLI runner
+
+Start with a command-line loop that can:
+
+- accept a task prompt
+- launch a browser session
+- call the model
+- execute the returned action
+- capture the next screenshot
+- stop for approval before sensitive actions
+
+### 2. Local dashboard
+
+Add a local web UI that can:
+
+- show the current task
+- display screenshots and action history
+- approve or reject the next step
+- export logs
+- retry from a checkpoint
+
+### 3. Safer automation modes
+
+Later, add modes like:
+
+- watch-only
+- approve-before-submit
+- trusted-site automation
+- regression/QA runs
+
+## Design Principles
 
 - Keep the human in the loop for anything destructive, expensive, or irreversible
 - Log every meaningful step so failures are debuggable
@@ -24,13 +84,13 @@ This repo is meant to stay public, simple, and experiment-friendly while the pro
 - Treat preview APIs as moving targets and design for change
 - Make the first version boring enough to trust
 
-## Build constraint
+## Build Constraint
 
-OpenAI's current computer-use guide describes `computer-use-preview` as a Responses API model with safety checks built in, so this repo should lean hard into approval checkpoints, trace logs, and watch-mode UX rather than pretending the agent can be fully autonomous out of the gate.
+OpenAI's computer-use guide says `computer-use-preview` is a specialized model for the computer use tool, usable only through the Responses API, and recommends browser-based tasks plus human oversight for risky flows. This repo should lean into approvals, traceability, and a local execution environment instead of pretending the agent can run unsupervised.
 
-## Brainstorming directions
+## Brainstorming Directions
 
-See [BRAINSTORM.md](./BRAINSTORM.md) for the initial idea space.
+See [BRAINSTORM.md](./BRAINSTORM.md) for the first product directions and safety posture.
 
 ## License
 

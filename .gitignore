@@ -1,16 +1,31 @@
 .DS_Store
+
+# Node / TypeScript
+node_modules/
+dist/
+build/
+coverage/
+.next/
+.turbo/
+.vite/
+.parcel-cache/
+
+# Local env
+.env
+.env.*
+*.local
+
+# Optional Python tooling
 __pycache__/
 *.py[cod]
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
-.env
-.env.*
 venv/
 .venv/
-dist/
-build/
-*.egg-info/
+
+# Scratch data
 *.db
 *.sqlite
 *.sqlite3
+*.egg-info/
