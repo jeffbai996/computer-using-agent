@@ -66,6 +66,14 @@ export function createApp(agent: AgentService): express.Express {
     }
   });
 
+  app.post("/api/sessions/:sessionId/resume", async (request, response, next) => {
+    try {
+      response.json(await agent.resume(request.params.sessionId));
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.post("/api/sessions/:sessionId/reject", async (request, response, next) => {
     try {
       const body = rejectSchema.parse(request.body ?? {});
