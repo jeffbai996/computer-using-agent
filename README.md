@@ -1,121 +1,106 @@
 # computer-using-agent
 
-TypeScript-first playground for building human-in-the-loop apps on top of OpenAI's computer-use preview tooling.
+TypeScript-first playground for local, human-in-the-loop computer-use agents.
 
 ## About
 
-This repo is for agents that interact with screens, browsers, and desktop workflows that are too annoying, too repetitive, or too brittle to keep doing by hand.
+This repo is for agents that interact with a browser through screenshots, UI actions, approvals, and trace logs.
 
-The point is not "fully autonomous magic." The point is a useful control loop with explicit approvals, trace logs, screenshots, and a sane escape hatch when the model gets weird.
+The goal is not unsupervised autonomy. The goal is a small local loop that can look at a screen, ask the model for the next UI action, pause when the next step is risky, and leave a useful audit trail.
 
-## Why TypeScript
+## MVP Shape
 
-TypeScript is the clean default here because the product naturally wants a web UI, browser automation, and a control plane that can all live in the same ecosystem.
+The current MVP is CLI-first:
 
-That said, the runtime can still be shaped a few ways:
+- one local browser session at a time
+- Playwright as the browser harness
+- SQLite plus local screenshot artifacts for persistence
+- append-only session events with a projected session state
+- explicit `approve` and `reject` commands for risky action batches
+- JSON export for debugging and replay
 
-- CLI-first for the fastest smoke tests
-- Local web app for task submission, approvals, and trace review
-- Desktop shell later if we want something more polished
-
-A pure hosted website cannot directly take over your computer by itself. If we want "control my computer through a website," the website becomes the front end and a local agent or remote VM does the actual computer work.
-
-## Suggested Architecture
-
-```mermaid
-flowchart LR
-  U[User] --> UI[Web UI or CLI]
-  UI --> API[Task API]
-  API --> AGENT[TypeScript agent worker]
-  AGENT --> CUA[OpenAI computer-use-preview]
-  AGENT --> BROWSER[Local browser or VM]
-  BROWSER --> AGENT
-  AGENT --> STORE[SQLite + artifacts]
-  STORE --> UI
-```
-
-## Core Pieces
-
-- Task input
-- Approval checkpoints
-- Screenshot timeline
-- Action trace
-- Retry / rollback boundaries
-- Allowlist / denylist
-- Session export
+The dashboard is a secondary local control surface. It should compile, but the CLI is the acceptance path for this phase.
 
 ## Quick Start
 
 ```bash
 npm install
-npm run dev
+npm run cli --workspace @cua/agent -- start "click the mock button"
 ```
 
-The local API starts at `http://127.0.0.1:4317`.
-The dashboard starts at `http://127.0.0.1:5173`.
-
-By default, the app uses a fake model and fake browser so the approval loop can be tested without spending API calls or opening a real browser.
+By default, the CLI uses a fake model and fake browser so the approval loop can run without API calls or a real browser.
 
 ```bash
-npm run cli --workspace @cua/agent -- start "open a mock browser task"
+npm run cli --workspace @cua/agent -- list
 npm run cli --workspace @cua/agent -- approve <sessionId>
+npm run cli --workspace @cua/agent -- reject <sessionId> "not safe"
+npm run cli --workspace @cua/agent -- resume <sessionId>
+npm run cli --workspace @cua/agent -- watch <sessionId>
 npm run cli --workspace @cua/agent -- export <sessionId>
 ```
 
-To use the real OpenAI and Playwright edges, set `OPENAI_API_KEY`, install Playwright's browser bundle, and pass `--real`.
+Run the optional local API and dashboard:
+
+```bash
+npm run dev
+```
+
+The API listens on `http://127.0.0.1:4317`.
+The dashboard listens on `http://127.0.0.1:5173`.
+
+## Real Mode
+
+Real mode uses OpenAI's GA computer-use flow with `gpt-5.4` and `tools: [{ type: "computer" }]`.
 
 ```bash
 npx playwright install chromium
-npm run cli --workspace @cua/agent -- serve --real
+OPENAI_API_KEY=... npm run cli --workspace @cua/agent -- start "open a harmless local browser task" --real
 ```
 
-## MVP Spec
+The default real-mode settings are:
 
-### 1. CLI runner
+- `CUA_MODEL=gpt-5.4`
+- `CUA_REASONING_EFFORT=xhigh`
+- `CUA_DATA_DIR=.cua-data`
+- `CUA_REAL_MODE=0`
+- `CUA_ALLOW_DOMAINS=`
+- `CUA_DENY_DOMAINS=`
+- `CUA_START_URL=about:blank`
 
-Start with a command-line loop that can:
+Set `CUA_COMPUTER_USE_MODE=preview` only if you need the older `computer-use-preview` compatibility path.
 
-- accept a task prompt
-- launch a browser session
-- call the model
-- execute the returned action
-- capture the next screenshot
-- stop for approval before sensitive actions
+## Safety Boundary
 
-### 2. Local dashboard
+The local browser is the execution boundary. The model proposes computer actions; this repo executes them only after the local policy allows the batch or the user approves it.
 
-Add a local web UI that can:
+The agent pauses for risky steps such as typing, clicking, keypresses, unknown actions, denied domains, and model-reported safety checks. Use narrow tasks and harmless local fixtures while developing.
 
-- show the current task
-- display screenshots and action history
-- approve or reject the next step
-- export logs
-- retry from a checkpoint
+## Architecture
 
-### 3. Safer automation modes
+```mermaid
+flowchart LR
+  CLI[CLI] --> AGENT[Agent service]
+  API[Local API] --> AGENT
+  AGENT --> MODEL[OpenAI computer tool]
+  AGENT --> BROWSER[Playwright browser]
+  AGENT --> STORE[SQLite events + artifacts]
+  STORE --> CLI
+  STORE --> API
+```
 
-Later, add modes like:
+## Development
 
-- watch-only
-- approve-before-submit
-- trusted-site automation
-- regression/QA runs
+```bash
+npm run check
+npm test
+npm run build
+```
 
-## Design Principles
+Browser executor tests are opt-in because they require local Playwright browser binaries:
 
-- Keep the human in the loop for anything destructive, expensive, or irreversible
-- Log every meaningful step so failures are debuggable
-- Prefer narrow prompts and explicit state over clever autonomy
-- Treat preview APIs as moving targets and design for change
-- Make the first version boring enough to trust
-
-## Build Constraint
-
-OpenAI's computer-use guide says `computer-use-preview` is a specialized model for the computer use tool, usable only through the Responses API, and recommends browser-based tasks plus human oversight for risky flows. This repo should lean into approvals, traceability, and a local execution environment instead of pretending the agent can run unsupervised.
-
-## Brainstorming Directions
-
-See [BRAINSTORM.md](./BRAINSTORM.md) for the first product directions and safety posture.
+```bash
+CUA_RUN_BROWSER_TESTS=1 npm test
+```
 
 ## License
 

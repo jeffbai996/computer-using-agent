@@ -13,6 +13,7 @@ coverage/
 # Local env
 .env
 .env.*
+!.env.example
 *.local
 
 # Optional Python tooling
