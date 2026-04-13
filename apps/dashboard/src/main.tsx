@@ -84,7 +84,7 @@ function App() {
 
   const screenshotEvent = [...(state.selected?.events ?? [])]
     .reverse()
-    .find((event) => event.type === "screenshot.captured");
+    .find((event) => event.type === "browser.snapshot_captured");
 
   return (
     <main className="shell">
@@ -154,7 +154,10 @@ function App() {
                 <figure className="screen">
                   {screenshotEvent ? (
                     <img
-                      src={String(screenshotEvent.data.screenshotPath)}
+                      src={String(
+                        (screenshotEvent.data.snapshot as { screenshotPath?: string })
+                          .screenshotPath,
+                      )}
                       alt="Latest agent screenshot"
                     />
                   ) : (
@@ -162,6 +165,11 @@ function App() {
                   )}
                 </figure>
                 <EventTrace events={state.selected.events} />
+                {state.selected.pendingActionBatch ? (
+                  <p className="pending">
+                    Pending actions: {state.selected.pendingActionBatch.actions.length}
+                  </p>
+                ) : null}
               </div>
             </>
           ) : (

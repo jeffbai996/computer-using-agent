@@ -7,9 +7,10 @@ export { createApp } from "./server/app.js";
 export { SqliteSessionStore } from "./session-store.js";
 export type {
   BrowserExecutor,
+  BatchExecutionResult,
   ModelClient,
-  ModelInput,
-  ModelStep,
-  Screenshot,
+  ModelTurnInput,
+  ScreenshotArtifact,
+  SessionExportBundle,
   SessionStore,
 } from "./ports.js";

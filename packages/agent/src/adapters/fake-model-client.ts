@@ -1,27 +1,35 @@
-import { randomId } from "@cua/core";
-import type { ModelClient, ModelInput, ModelStep } from "../ports.js";
+import { randomId, type TurnOutcome } from "@cua/core";
+import type { ModelClient, ModelTurnInput } from "../ports.js";
 
 export class FakeModelClient implements ModelClient {
-  async nextStep(input: ModelInput): Promise<ModelStep> {
-    const requestedActions = input.session.events.filter(
-      (event) => event.type === "action.requested",
+  async createTurn(input: ModelTurnInput): Promise<TurnOutcome> {
+    const requestedBatches = input.session.events.filter(
+      (event) => event.type === "action_batch.requested",
     );
 
-    if (requestedActions.length > 0) {
+    if (requestedBatches.length > 0) {
       return {
-        type: "complete",
-        message: "Mock task completed after one approved action.",
+        type: "completed",
+        message: "Mock task completed after one approved batch.",
+        responseId: randomId("response"),
       };
     }
 
     return {
-      type: "action",
-      action: {
-        id: randomId("action"),
-        kind: "click",
+      type: "action_batch",
+      responseId: randomId("response"),
+      batch: {
+        id: randomId("batch"),
         description: "Mock click on the browser viewport",
-        payload: { x: 320, y: 240 },
-        sensitive: true,
+        actions: [
+          {
+            id: randomId("action"),
+            kind: "click",
+            description: "Click the mock button",
+            payload: { x: 320, y: 240 },
+            sensitive: true,
+          },
+        ],
       },
     };
   }

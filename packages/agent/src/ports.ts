@@ -1,42 +1,55 @@
-import type { AgentAction, AgentSession } from "@cua/core";
+import type {
+  ActionBatch,
+  AgentSession,
+  BrowserSnapshot,
+  SafetyCheck,
+  TraceEvent,
+  TurnOutcome,
+} from "@cua/core";
 
-export type Screenshot = {
-  mimeType: "image/png";
-  base64: string;
-};
-
-export type ModelStep =
-  | {
-      type: "action";
-      action: AgentAction;
-    }
-  | {
-      type: "complete";
-      message: string;
-    };
-
-export type ModelInput = {
+export type ModelTurnInput = {
   task: string;
   session: AgentSession;
-  screenshot?: Screenshot;
+  snapshot?: BrowserSnapshot;
+  acknowledgedSafetyChecks?: SafetyCheck[];
 };
 
 export type ModelClient = {
-  nextStep(input: ModelInput): Promise<ModelStep>;
+  createTurn(input: ModelTurnInput): Promise<TurnOutcome>;
+};
+
+export type BatchExecutionResult = {
+  executedActions: ActionBatch["actions"];
+  snapshot: BrowserSnapshot;
 };
 
 export type BrowserExecutor = {
-  open(): Promise<void>;
-  captureScreenshot(): Promise<Screenshot>;
-  execute(action: AgentAction): Promise<void>;
-  close(): Promise<void>;
+  open(sessionId: string): Promise<void>;
+  captureSnapshot(sessionId: string): Promise<BrowserSnapshot>;
+  executeBatch(sessionId: string, batch: ActionBatch): Promise<BatchExecutionResult>;
+  close(sessionId: string): Promise<void>;
+};
+
+export type SessionExportBundle = {
+  projection: AgentSession;
+  events: TraceEvent[];
+};
+
+export type ScreenshotArtifact = {
+  urlPath: string;
+  filePath: string;
 };
 
 export type SessionStore = {
   create(session: AgentSession): Promise<void>;
-  save(session: AgentSession): Promise<void>;
+  appendEvent(session: AgentSession, event: TraceEvent): Promise<AgentSession>;
   get(sessionId: string): Promise<AgentSession | undefined>;
   list(): Promise<AgentSession[]>;
   export(sessionId: string): Promise<string>;
-  saveScreenshot(sessionId: string, eventId: string, screenshot: Screenshot): Promise<string>;
+  saveScreenshot(
+    sessionId: string,
+    eventId: string,
+    snapshot: BrowserSnapshot,
+  ): Promise<ScreenshotArtifact>;
+  saveRawModelResponse(sessionId: string, eventId: string, response: unknown): Promise<string>;
 };
