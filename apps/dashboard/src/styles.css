@@ -16,7 +16,9 @@ body {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -30,6 +32,7 @@ input {
 }
 
 .command-strip,
+.workflow-panel,
 .workspace,
 .run-header,
 .screen-and-trace {
@@ -75,12 +78,19 @@ form {
   gap: 10px;
 }
 
-input {
+input,
+select,
+textarea {
   min-width: 0;
   border: 2px solid #171717;
   border-radius: 8px;
   padding: 14px 16px;
   background: #ffffff;
+}
+
+textarea {
+  min-height: 84px;
+  resize: vertical;
 }
 
 button {
@@ -107,6 +117,43 @@ button:disabled {
   margin: 0 auto 16px;
   color: #b42318;
   font-weight: 700;
+}
+
+.workflow-panel {
+  grid-template-columns: minmax(260px, 0.75fr) minmax(320px, 1.25fr);
+  max-width: 1320px;
+  margin: 0 auto 24px;
+  border: 2px solid #171717;
+  border-radius: 12px;
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.workflow-panel p {
+  max-width: 660px;
+  margin: 10px 0 0;
+  color: #4b4b4b;
+}
+
+.workflow-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.workflow-controls label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.84rem;
+  font-weight: 800;
+}
+
+.workflow-controls label:nth-last-child(2) {
+  grid-column: span 2;
+}
+
+.workflow-controls button {
+  align-self: end;
 }
 
 .workspace {
@@ -205,6 +252,29 @@ button:disabled {
   list-style: none;
 }
 
+.side-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.approval-card {
+  display: grid;
+  gap: 6px;
+  border: 2px solid #171717;
+  border-radius: 8px;
+  padding: 14px;
+  background: #ffffff;
+}
+
+.approval-card.waiting {
+  background: #fff1b8;
+}
+
+.approval-card span,
+.approval-card small {
+  color: #5c5c5c;
+}
+
 .trace li {
   display: flex;
   justify-content: space-between;
@@ -228,10 +298,17 @@ button:disabled {
   }
 
   .command-strip,
+  .workflow-panel,
   .workspace,
   .run-header,
   .screen-and-trace,
   form {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-controls,
+  .workflow-controls label:nth-last-child(2) {
+    grid-column: auto;
     grid-template-columns: 1fr;
   }
 
