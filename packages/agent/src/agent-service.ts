@@ -10,12 +10,19 @@ import {
   type SafetyCheck,
   type TraceEvent,
   type TurnOutcome,
+  type WorkflowCheckpoint,
+  type WorkflowRunMetadata,
 } from "@cua/core";
 import type { BrowserExecutor, ModelClient, SessionStore } from "./ports.js";
 
 type AgentServiceOptions = {
   policy?: BrowserPolicy;
   maxTurns?: number;
+};
+
+export type StartTaskOptions = {
+  workflow?: WorkflowRunMetadata;
+  startUrl?: string;
 };
 
 const DEFAULT_MAX_TURNS = 20;
@@ -37,13 +44,16 @@ export class AgentService {
     this.maxTurns = options.maxTurns ?? DEFAULT_MAX_TURNS;
   }
 
-  async startTask(task: string): Promise<AgentSession> {
-    let session = createSession(task);
+  async startTask(task: string, options: StartTaskOptions = {}): Promise<AgentSession> {
+    let session = createSession(task, new Date(), options.workflow);
 
     await this.store.create(session);
-    session = await this.record(session, "task.started", { task });
+    session = await this.record(session, "task.started", {
+      task,
+      workflow: options.workflow,
+    });
 
-    await this.browser.open(session.id);
+    await this.browser.open(session.id, { startUrl: options.startUrl });
     session = await this.captureSnapshot(session);
 
     return this.continueLoop(session);
@@ -170,7 +180,12 @@ export class AgentService {
     safetyChecks: SafetyCheck[] = [],
   ): Promise<AgentSession> {
     let next = await this.record(session, "action_batch.requested", { batch });
-    const policyDecision = requiresApproval(batch, snapshotForSession(next), this.policy);
+    const policyDecision = requiresApproval(
+      batch,
+      snapshotForSession(next),
+      policyForSession(this.policy, next),
+    );
+    const workflowDecision = workflowCheckpointForBatch(batch, snapshotForSession(next));
     const allSafetyChecks = [
       ...safetyChecks,
       ...policyDecision.reasons.map((reason) => ({
@@ -178,12 +193,19 @@ export class AgentService {
         code: "approval_required",
         message: reason,
       })),
+      ...workflowDecision.reasons.map((reason) => ({
+        id: `workflow_${reason.replace(/\W+/g, "_").toLowerCase()}`,
+        code: "workflow_checkpoint",
+        message: reason,
+      })),
     ];
 
-    if (policyDecision.required || allSafetyChecks.length > 0) {
+    if (policyDecision.required || workflowDecision.required || allSafetyChecks.length > 0) {
       return this.record(next, "approval.required", {
         batch,
         safetyChecks: allSafetyChecks,
+        checkpoint: workflowDecision.checkpoint,
+        reason: [...policyDecision.reasons, ...workflowDecision.reasons].join("; "),
       });
     }
 
@@ -286,4 +308,76 @@ function snapshotForSession(session: AgentSession): BrowserSnapshot | undefined 
 
 function isTerminalStatus(status: AgentSession["status"]): boolean {
   return ["completed", "failed", "rejected"].includes(status);
+}
+
+function policyForSession(basePolicy: BrowserPolicy, session: AgentSession): BrowserPolicy {
+  const workflowPolicy = session.workflow?.policy;
+
+  return {
+    allowDomains: basePolicy.allowDomains ?? workflowPolicy?.allowDomains,
+    denyDomains: [
+      ...(basePolicy.denyDomains ?? []),
+      ...(workflowPolicy?.denyDomains ?? []),
+    ],
+  };
+}
+
+function workflowCheckpointForBatch(
+  batch: ActionBatch,
+  snapshot?: BrowserSnapshot,
+): {
+  required: boolean;
+  checkpoint?: WorkflowCheckpoint;
+  reasons: string[];
+} {
+  const raw = JSON.stringify({
+    actions: batch.actions.map((action) => ({
+      kind: action.kind,
+      payload: action.payload,
+      description: action.description,
+    })),
+    currentUrl: snapshot?.currentUrl,
+  }).toLowerCase();
+
+  if (/pay|payment|purchase|checkout|place order|confirm order/.test(raw)) {
+    return {
+      required: true,
+      checkpoint: "payment",
+      reasons: ["workflow payment checkpoint"],
+    };
+  }
+
+  if (/submit|confirm|send|delete|remove|cancel/.test(raw)) {
+    return {
+      required: true,
+      checkpoint: "submit",
+      reasons: ["workflow submit checkpoint"],
+    };
+  }
+
+  if (/login|log in|sign in|password|oauth/.test(raw)) {
+    return {
+      required: true,
+      checkpoint: "login",
+      reasons: ["workflow login checkpoint"],
+    };
+  }
+
+  if (/cart|bag|basket|quantity/.test(raw)) {
+    return {
+      required: true,
+      checkpoint: "cart_change",
+      reasons: ["workflow cart checkpoint"],
+    };
+  }
+
+  if (/upload|download|file/.test(raw)) {
+    return {
+      required: true,
+      checkpoint: "download_upload",
+      reasons: ["workflow file-transfer checkpoint"],
+    };
+  }
+
+  return { required: false, reasons: [] };
 }

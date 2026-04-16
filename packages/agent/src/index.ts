@@ -5,8 +5,15 @@ export { OpenAIComputerUseClient } from "./adapters/openai-computer-use-client.j
 export { PlaywrightBrowserExecutor } from "./adapters/playwright-browser-executor.js";
 export { createApp } from "./server/app.js";
 export { SqliteSessionStore } from "./session-store.js";
+export {
+  createWorkflowStart,
+  getWorkflowFixtureHtml,
+  getWorkflowSummary,
+  listWorkflowSummaries,
+} from "./workflows/index.js";
 export type {
   BrowserExecutor,
+  BrowserOpenOptions,
   BatchExecutionResult,
   ModelClient,
   ModelTurnInput,

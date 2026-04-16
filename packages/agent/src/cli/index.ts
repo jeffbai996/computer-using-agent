@@ -1,4 +1,5 @@
 import type { AgentSession } from "@cua/core";
+import type { WorkflowInputs, WorkflowMode, WorkflowSummary } from "@cua/core";
 import { AgentService } from "../agent-service.js";
 import { FakeBrowserExecutor } from "../adapters/fake-browser-executor.js";
 import { FakeModelClient } from "../adapters/fake-model-client.js";
@@ -6,6 +7,11 @@ import { OpenAIComputerUseClient } from "../adapters/openai-computer-use-client.
 import { PlaywrightBrowserExecutor } from "../adapters/playwright-browser-executor.js";
 import { createApp } from "../server/app.js";
 import { SqliteSessionStore } from "../session-store.js";
+import {
+  createWorkflowStart,
+  getWorkflowSummary,
+  listWorkflowSummaries,
+} from "../workflows/index.js";
 
 const command = process.argv[2] ?? "help";
 const args = process.argv.slice(3);
@@ -19,6 +25,11 @@ async function main(): Promise<void> {
     app.listen(port, "127.0.0.1", () => {
       console.log(`computer-using-agent API listening on http://127.0.0.1:${port}`);
     });
+    return;
+  }
+
+  if (command === "workflow") {
+    await handleWorkflowCommand(args);
     return;
   }
 
@@ -107,7 +118,69 @@ async function main(): Promise<void> {
   npm run cli --workspace @cua/agent -- approve <sessionId> [--real]
   npm run cli --workspace @cua/agent -- reject <sessionId> [reason]
   npm run cli --workspace @cua/agent -- watch <sessionId>
-  npm run cli --workspace @cua/agent -- export <sessionId>`);
+  npm run cli --workspace @cua/agent -- export <sessionId>
+  npm run cli --workspace @cua/agent -- workflow list
+  npm run cli --workspace @cua/agent -- workflow describe <workflowId>
+  npm run cli --workspace @cua/agent -- workflow start <workflowId> [--mode fixture|browse|real] [--input key=value] [--real]
+  npm run cli --workspace @cua/agent -- workflow export <sessionId>`);
+}
+
+async function handleWorkflowCommand(rawArgs: string[]): Promise<void> {
+  const subcommand = rawArgs[0] ?? "help";
+
+  if (subcommand === "list") {
+    for (const workflow of listWorkflowSummaries()) {
+      console.log(`${workflow.id}\t${workflow.title}\t${workflow.modes.join(",")}`);
+    }
+    return;
+  }
+
+  if (subcommand === "describe") {
+    const workflow = getWorkflowSummary(rawArgs[1] ?? "");
+
+    if (!workflow) {
+      throw new Error("Usage: npm run cli --workspace @cua/agent -- workflow describe <workflowId>");
+    }
+
+    printWorkflow(workflow);
+    return;
+  }
+
+  if (subcommand === "start") {
+    const workflowId = rawArgs[1];
+
+    if (!workflowId) {
+      throw new Error("Usage: npm run cli --workspace @cua/agent -- workflow start <workflowId>");
+    }
+
+    const options = parseWorkflowOptions(rawArgs.slice(2));
+    const plan = createWorkflowStart(workflowId, options);
+    const agent = makeAgent({ real: isRealMode(rawArgs) });
+    printSession(
+      await agent.startTask(plan.task, {
+        workflow: plan.metadata,
+        startUrl: plan.startUrl,
+      }),
+    );
+    return;
+  }
+
+  if (subcommand === "export") {
+    const sessionId = rawArgs[1];
+
+    if (!sessionId) {
+      throw new Error("Usage: npm run cli --workspace @cua/agent -- workflow export <sessionId>");
+    }
+
+    console.log(await makeAgent({ real: isRealMode(rawArgs) }).exportSession(sessionId));
+    return;
+  }
+
+  console.log(`Usage:
+  npm run cli --workspace @cua/agent -- workflow list
+  npm run cli --workspace @cua/agent -- workflow describe <workflowId>
+  npm run cli --workspace @cua/agent -- workflow start <workflowId> [--mode fixture|browse|real] [--input key=value] [--real]
+  npm run cli --workspace @cua/agent -- workflow export <sessionId>`);
 }
 
 function makeAgent(options: { real?: boolean } = {}): AgentService {
@@ -133,8 +206,24 @@ function printSession(session: AgentSession): void {
     ? ` pending=${session.pendingActionBatch.actions.length}`
     : "";
   const error = session.lastError ? ` error="${session.lastError}"` : "";
+  const workflow = session.workflow ? ` workflow=${session.workflow.id}` : "";
 
-  console.log(`${session.id} status=${session.status}${pending}${error}`);
+  console.log(`${session.id} status=${session.status}${workflow}${pending}${error}`);
+}
+
+function printWorkflow(workflow: WorkflowSummary): void {
+  console.log(`${workflow.id}: ${workflow.title}`);
+  console.log(workflow.description);
+  console.log(`Modes: ${workflow.modes.join(", ")}; default=${workflow.defaultMode}`);
+  console.log("Inputs:");
+  for (const field of workflow.inputFields) {
+    const required = field.required ? " required" : "";
+    const defaultValue =
+      field.defaultValue === undefined || field.defaultValue === ""
+        ? ""
+        : ` default=${field.defaultValue}`;
+    console.log(`- ${field.name} (${field.kind}${required}${defaultValue})`);
+  }
 }
 
 async function watchSession(agent: AgentService, sessionId: string): Promise<void> {
@@ -167,6 +256,79 @@ function isRealMode(rawArgs: string[]): boolean {
 
 function stripFlags(rawArgs: string[]): string[] {
   return rawArgs.filter((arg) => arg !== "--real");
+}
+
+function parseWorkflowOptions(rawArgs: string[]): {
+  mode?: WorkflowMode;
+  inputs: WorkflowInputs;
+} {
+  const inputs: WorkflowInputs = {};
+  let mode: WorkflowMode | undefined;
+
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const arg = rawArgs[index];
+
+    if (arg === "--real") {
+      continue;
+    }
+
+    if (arg === "--mode") {
+      mode = parseWorkflowMode(rawArgs[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--mode=")) {
+      mode = parseWorkflowMode(arg.slice("--mode=".length));
+      continue;
+    }
+
+    if (arg === "--input") {
+      assignInput(inputs, rawArgs[index + 1]);
+      index += 1;
+      continue;
+    }
+
+    if (arg.startsWith("--input=")) {
+      assignInput(inputs, arg.slice("--input=".length));
+    }
+  }
+
+  return { mode, inputs };
+}
+
+function parseWorkflowMode(rawMode: string | undefined): WorkflowMode {
+  if (rawMode === "fixture" || rawMode === "browse" || rawMode === "real") {
+    return rawMode;
+  }
+
+  throw new Error("Workflow mode must be fixture, browse, or real.");
+}
+
+function assignInput(inputs: WorkflowInputs, rawPair: string | undefined): void {
+  if (!rawPair || !rawPair.includes("=")) {
+    throw new Error("Workflow inputs must use key=value.");
+  }
+
+  const [key, ...rest] = rawPair.split("=");
+  inputs[key] = coerceInputValue(rest.join("="));
+}
+
+function coerceInputValue(raw: string): string | number | boolean | null {
+  if (raw === "true") {
+    return true;
+  }
+
+  if (raw === "false") {
+    return false;
+  }
+
+  if (raw === "null") {
+    return null;
+  }
+
+  const numeric = Number(raw);
+  return raw.trim() !== "" && Number.isFinite(numeric) ? numeric : raw;
 }
 
 main().catch((error: unknown) => {

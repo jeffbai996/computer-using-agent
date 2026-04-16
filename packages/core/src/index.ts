@@ -47,6 +47,60 @@ export type SafetyCheck = {
   message: string;
 };
 
+export type WorkflowMode = "fixture" | "browse" | "real";
+
+export type WorkflowCheckpoint =
+  | "browse"
+  | "form_entry"
+  | "cart_change"
+  | "login"
+  | "external_navigation"
+  | "download_upload"
+  | "payment"
+  | "submit"
+  | "complete";
+
+export type WorkflowInputValue = string | number | boolean | null;
+
+export type WorkflowInputs = Record<string, WorkflowInputValue>;
+
+export type WorkflowInputField = {
+  name: string;
+  label: string;
+  kind: "text" | "number" | "textarea" | "select";
+  required?: boolean;
+  defaultValue?: WorkflowInputValue;
+  description?: string;
+  placeholder?: string;
+  options?: string[];
+  sensitive?: boolean;
+};
+
+export type WorkflowCheckpointRecord = {
+  checkpoint: WorkflowCheckpoint;
+  reason: string;
+  createdAt: string;
+};
+
+export type WorkflowRunMetadata = {
+  id: string;
+  title: string;
+  mode: WorkflowMode;
+  inputs: WorkflowInputs;
+  target: string;
+  policy?: BrowserPolicy;
+  checkpoints: WorkflowCheckpointRecord[];
+};
+
+export type WorkflowSummary = {
+  id: string;
+  title: string;
+  description: string;
+  modes: WorkflowMode[];
+  defaultMode: WorkflowMode;
+  inputFields: WorkflowInputField[];
+};
+
 export type TurnOutcome =
   | {
       type: "action_batch";
@@ -127,6 +181,7 @@ export type AgentSession = {
   previousComputerCallId?: string;
   lastError?: string;
   rawModelResponsePath?: string;
+  workflow?: WorkflowRunMetadata;
 };
 
 export type ApprovalDecision = {
@@ -139,7 +194,11 @@ export type BrowserPolicy = {
   denyDomains?: string[];
 };
 
-export function createSession(task: string, now = new Date()): AgentSession {
+export function createSession(
+  task: string,
+  now = new Date(),
+  workflow?: WorkflowRunMetadata,
+): AgentSession {
   const createdAt = now.toISOString();
 
   return {
@@ -149,6 +208,7 @@ export function createSession(task: string, now = new Date()): AgentSession {
     createdAt,
     updatedAt: createdAt,
     events: [],
+    workflow,
   };
 }
 
@@ -228,6 +288,7 @@ export function reduceSession(session: AgentSession, event: TraceEvent): AgentSe
       pendingActionBatch:
         (event.data.batch as ActionBatch | undefined) ?? next.pendingActionBatch,
       pendingSafetyChecks: event.data.safetyChecks as SafetyCheck[] | undefined,
+      workflow: appendWorkflowCheckpoint(next.workflow, event),
     };
   }
 
@@ -360,6 +421,33 @@ export function randomId(prefix: string): string {
 
 function isTerminalStatus(status: SessionStatus): boolean {
   return ["completed", "failed", "rejected"].includes(status);
+}
+
+function appendWorkflowCheckpoint(
+  workflow: WorkflowRunMetadata | undefined,
+  event: TraceEvent,
+): WorkflowRunMetadata | undefined {
+  if (!workflow) {
+    return undefined;
+  }
+
+  const checkpoint = event.data.checkpoint as WorkflowCheckpoint | undefined;
+
+  if (!checkpoint) {
+    return workflow;
+  }
+
+  return {
+    ...workflow,
+    checkpoints: [
+      ...workflow.checkpoints,
+      {
+        checkpoint,
+        reason: String(event.data.reason ?? "Approval required."),
+        createdAt: event.createdAt,
+      },
+    ],
+  };
 }
 
 function mutatesTerminalSession(type: TraceEventType): boolean {

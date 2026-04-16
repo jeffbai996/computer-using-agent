@@ -19,7 +19,7 @@ export class PlaywrightBrowserExecutor implements BrowserExecutor {
     private readonly startUrl = process.env.CUA_START_URL ?? "about:blank",
   ) {}
 
-  async open(sessionId: string): Promise<void> {
+  async open(sessionId: string, options: { startUrl?: string } = {}): Promise<void> {
     if (this.sessions.has(sessionId)) {
       return;
     }
@@ -35,7 +35,7 @@ export class PlaywrightBrowserExecutor implements BrowserExecutor {
     const page = context.pages()[0] ?? (await context.newPage());
 
     if (page.url() === "about:blank") {
-      await page.goto(this.startUrl);
+      await page.goto(options.startUrl ?? this.startUrl);
     }
 
     this.sessions.set(sessionId, { context, page });

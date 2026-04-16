@@ -7,7 +7,7 @@ const transparentPng =
 export class FakeBrowserExecutor implements BrowserExecutor {
   public executedActions: ComputerAction[] = [];
 
-  async open(_sessionId: string): Promise<void> {
+  async open(_sessionId: string, _options?: { startUrl?: string }): Promise<void> {
     return;
   }
 

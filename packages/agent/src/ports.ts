@@ -23,8 +23,12 @@ export type BatchExecutionResult = {
   snapshot: BrowserSnapshot;
 };
 
+export type BrowserOpenOptions = {
+  startUrl?: string;
+};
+
 export type BrowserExecutor = {
-  open(sessionId: string): Promise<void>;
+  open(sessionId: string, options?: BrowserOpenOptions): Promise<void>;
   captureSnapshot(sessionId: string): Promise<BrowserSnapshot>;
   executeBatch(sessionId: string, batch: ActionBatch): Promise<BatchExecutionResult>;
   close(sessionId: string): Promise<void>;
