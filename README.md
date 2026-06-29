@@ -1,5 +1,7 @@
 # computer-using-agent
 
+> **Archived:** This repo is preserved as a snapshot of an early local computer-use agent playground. Active development has moved elsewhere, so the code here should be treated as reference material rather than a maintained project.
+
 TypeScript-first playground for local, human-in-the-loop computer-use agents.
 
 ## About
